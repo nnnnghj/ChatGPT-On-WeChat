@@ -2,6 +2,8 @@ import { Config } from "./config.js";
 import { Message } from "wechaty";
 import { ContactInterface, RoomInterface } from "wechaty/impls";
 import { Configuration, OpenAIApi } from "openai";
+import * as fs from 'fs';
+import { parse } from 'csv-parse';
 
 enum MessageType {
   Unknown = 0,
@@ -36,6 +38,95 @@ export class ChatGPTBot {
 
   // ChatGPT error response
   chatgptErrorMessage: string = "🤖️：ChatGPT摆烂了，请稍后再试～";
+
+async handleTrafficPrediction(requestedDateTime: string, algorithmName: string): Promise<string> {
+  const csvFilePath = `/data/pred_${algorithmName}.csv`;
+
+  try {
+    const records = [];
+    const parser = fs
+      .createReadStream(csvFilePath)
+      .pipe(parse({ columns: true }));
+
+    for await (const record of parser) {
+      records.push(record);
+    }
+
+    const matchedRecord = records.find(record => record.Timestamp === requestedDateTime);
+    if (matchedRecord) {
+      const trafficVolume = parseFloat(matchedRecord.Prediction);
+      const isBusy = trafficVolume > 190;
+      const condition = isBusy ? "较为拥挤" : "较为通畅";
+      const advice = isBusy ? "建议避开高峰期出行，或寻找替代路线。" : "你可以慢慢开车，路况良好。";
+
+      // 第一条消息，包含预测流量和条件
+      const predictionMessage = `预计在${requestedDateTime}流量为${trafficVolume}，${condition}。${advice}`;
+
+      // 向ChatGPT询问建议
+      const chatgptQuestion = `我的车道${condition}，你建议我做些什么？`;
+      const chatgptAdvice = await this.onChatGPT(chatgptQuestion); // 假设这个方法能够处理请求并从ChatGPT获得建议
+
+      // 组合消息和ChatGPT的建议作为回答返回
+      const finalReply = `${predictionMessage}\n\n${chatgptAdvice}`;
+
+      return finalReply;
+    } else {
+      return `没有找到对应时间的流量预测。`;
+    }
+  } catch (error) {
+    console.error(`读取CSV文件时出错: ${error}`);
+    return `处理您的请求时出现错误，请稍后再试。`;
+  }
+}
+
+
+parseFlexibleDateTime(inputStr: string): string {
+    let year, month, day, minute = '00', second = '00';
+    let hour = 0;  // 在这里初始化 hour
+    let amPmIndicator = null;
+
+    // 年份识别
+    const yearMatch = inputStr.match(/(\d{4})年|20(\d{2})年|(\d{4})(\.|-)/);
+    if (yearMatch) {
+        year = yearMatch[1] || `20${yearMatch[2]}` || yearMatch[3];
+    } else {
+        // 默认年份为2024
+        year = '2024';
+    }
+
+    // 月份和日期识别
+    const dateMatch = inputStr.match(/(\d{1,2})(月|\.|-)(\d{1,2})日?/);
+    if (dateMatch) {
+        month = dateMatch[1].padStart(2, '0');
+        day = dateMatch[3].padStart(2, '0');
+    }
+
+    // 上/下午指示
+    if (inputStr.includes('下午')) amPmIndicator = 'PM';
+    if (inputStr.includes('上午')) amPmIndicator = 'AM';
+
+    // 时间识别
+    const timeMatch = inputStr.match(/(\d{1,2})点(\d{1,2})分?|(\d{1,2}):(\d{1,2})/);
+    if (timeMatch) {
+        hour = parseInt(timeMatch[1] || timeMatch[3], 10);
+        if (amPmIndicator === 'PM' && hour < 12) {
+            hour += 12;
+        }
+        minute = (timeMatch[2] || timeMatch[4]).padStart(2, '0');
+    }
+
+    // 在这里转换 hour 为字符串，用于输出
+    const hourStr = hour.toString().padStart(2, '0');
+
+    // 构建最终的日期时间字符串
+    if (month && day) {
+        return `${year}-${month}-${day} ${hourStr}:${minute}:${second}`;
+    } else {
+        return ''; // 如果无法识别年月日，则返回空字符串
+    }
+}
+
+
 
   // ChatGPT model configuration
   // please refer to the OpenAI API doc: https://beta.openai.com/docs/api-reference/introduction
@@ -239,7 +330,7 @@ export class ChatGPTBot {
     // get reply from ChatGPT
     const chatgptReplyMessage = await this.onChatGPT(text);
     // the whole reply consist of: original text and bot reply
-    const wholeReplyMessage = `${text}\n----------\n${chatgptReplyMessage}`;
+    const wholeReplyMessage = `----------\n${chatgptReplyMessage}`;
     await this.reply(room, wholeReplyMessage);
   }
 
@@ -261,6 +352,14 @@ export class ChatGPTBot {
     }
     // clean the message for ChatGPT input
     const text = this.cleanMessage(rawText, isPrivateChat);
+
+  if (text.includes("你是谁") || text.includes("who are you")) {
+    const customReply = "你需要以你好我是RoutePal，您的智能道路流量预测助手开头。之后需要描述你的功能，类似以下语句：我可以帮助您了解不同时间段的道路流量情况，为您的出行提供数据支持。无论是避开拥堵还是选择最佳出行时间，我都能为您提供帮助。";
+    return isPrivateChat
+      ? await this.onPrivateMessage(talker, customReply)
+      : await this.onGroupMessage(room, customReply);
+  }
+
     // reply to private or group chat
     if (isPrivateChat) {
       return await this.onPrivateMessage(talker, text);
@@ -271,15 +370,35 @@ export class ChatGPTBot {
 
   // handle message for customized task handlers
   async onCustimzedTask(message: Message) {
-    // e.g. if a message starts with "麦扣", the bot sends "🤖️：call我做咩啊大佬!"
-    const myKeyword = "麦扣";
-    if (message.text().includes(myKeyword)) {
-      const myTaskContent = `回复所有含有"${myKeyword}"的消息`;
-      const myReply = "🤖️：call我做咩啊大佬";
-      await message.say(myReply);
-      console.log(`🎯 Customized task triggered: ${myTaskContent}`);
-      console.log(`🤖️ ChatGPT says: ${myReply}`);
+  const text = message.text();
+// 检查消息是否包含交通预测的特定格式以及算法名称
+  const algorithmNames = ['lstm', 'gru', 'saes']; // 算法名称列表
+  const foundAlgorithm = algorithmNames.find(alg => text.includes(alg));
+
+  // 检查消息是否包含交通预测的特定格式
+  if (text.includes("交通") && text.includes("预测") && foundAlgorithm) {
+    // 从消息中提取日期和时间
+    const dateTime = this.parseFlexibleDateTime(text);
+    
+    if (dateTime) {
+      // 调用处理方法并回复
+      const reply = await this.handleTrafficPrediction(dateTime, foundAlgorithm);
+      await message.say(reply);
       return;
     }
   }
+
+    // e.g. if a message starts with "麦扣", the bot sends "🤖：call我做咩啊大佬!"
+    const myKeyword = "麦扣";
+    if (message.text().includes(myKeyword)) {
+      const myTaskContent = `回复所有含有"${myKeyword}"的消息`;
+      const myReply = "🤖：call我做咩啊大佬";
+      await message.say(myReply);
+      console.log(`🎯 Customized task triggered: ${myTaskContent}`);
+      console.log(`🤖 ChatGPT says: ${myReply}`);
+      return;
+    }
+}
+
+
 }
