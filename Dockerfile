@@ -7,13 +7,20 @@ ARG POETRY_VERSION=1.2.2
 
 # 更新apt-get并安装基本工具
 RUN apt-get update && \
-    apt-get install -y curl gnupg && \
-    curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get install -y npm && \
+    apt-get install -y curl gnupg
+
+# 添加Node.js源并安装Node.js和npm
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs
+
+# 安装npm并修复缺失的依赖项
+RUN apt-get install -y npm --fix-missing && \
+    apt-get install -f && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir poetry==$POETRY_VERSION && \
+    rm -rf /var/lib/apt/lists/*
+
+# 安装Poetry
+RUN pip install --no-cache-dir poetry==$POETRY_VERSION && \
     rm -rf ~/.cache/ && \
     echo "环境设置完成"
 
