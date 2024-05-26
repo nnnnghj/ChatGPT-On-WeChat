@@ -59,14 +59,14 @@ async handleTrafficPrediction(requestedDateTime: string, algorithmName: string):
       const condition = isBusy ? "较为拥挤" : "较为通畅";
       const advice = isBusy ? "建议避开高峰期出行，或寻找替代路线。" : "你可以慢慢开车，路况良好。";
 
-      // 第一条消息，包含预测流量和条件
+      // The first message contains the predicted traffic and conditions
       const predictionMessage = `预计在${requestedDateTime}流量为${trafficVolume}，${condition}。${advice}`;
 
-      // 向ChatGPT询问建议
+      // Ask ChatGPT for recommendations
       const chatgptQuestion = `我的车道${condition}，你建议我做些什么？`;
       const chatgptAdvice = await this.onChatGPT(chatgptQuestion); // 假设这个方法能够处理请求并从ChatGPT获得建议
 
-      // 组合消息和ChatGPT的建议作为回答返回
+      // The suggestion to combine the message and ChatGPT is returned as an answer
       const finalReply = `${predictionMessage}\n\n${chatgptAdvice}`;
 
       return finalReply;
@@ -82,30 +82,30 @@ async handleTrafficPrediction(requestedDateTime: string, algorithmName: string):
 
 parseFlexibleDateTime(inputStr: string): string {
     let year, month, day, minute = '00', second = '00';
-    let hour = 0;  // 在这里初始化 hour
+    let hour = 0;  // Initialize hour here
     let amPmIndicator = null;
 
-    // 年份识别
+    // year
     const yearMatch = inputStr.match(/(\d{4})年|20(\d{2})年|(\d{4})(\.|-)/);
     if (yearMatch) {
         year = yearMatch[1] || `20${yearMatch[2]}` || yearMatch[3];
     } else {
-        // 默认年份为2024
+        // Default is 2024
         year = '2024';
     }
 
-    // 月份和日期识别
+    // months\days
     const dateMatch = inputStr.match(/(\d{1,2})(月|\.|-)(\d{1,2})日?/);
     if (dateMatch) {
         month = dateMatch[1].padStart(2, '0');
         day = dateMatch[3].padStart(2, '0');
     }
 
-    // 上/下午指示
+    // AM\PM
     if (inputStr.includes('下午')) amPmIndicator = 'PM';
     if (inputStr.includes('上午')) amPmIndicator = 'AM';
 
-    // 时间识别
+    // detail time
     const timeMatch = inputStr.match(/(\d{1,2})点(\d{1,2})分?|(\d{1,2}):(\d{1,2})/);
     if (timeMatch) {
         hour = parseInt(timeMatch[1] || timeMatch[3], 10);
@@ -115,14 +115,14 @@ parseFlexibleDateTime(inputStr: string): string {
         minute = (timeMatch[2] || timeMatch[4]).padStart(2, '0');
     }
 
-    // 在这里转换 hour 为字符串，用于输出
+    // here convert hour to a string for output
     const hourStr = hour.toString().padStart(2, '0');
 
-    // 构建最终的日期时间字符串
+    // Builds the final date-time string
     if (month && day) {
         return `${year}-${month}-${day} ${hourStr}:${minute}:${second}`;
     } else {
-        return ''; // 如果无法识别年月日，则返回空字符串
+        return ''; // If the year, month and day cannot be recognized, an empty string is returned
     }
 }
 

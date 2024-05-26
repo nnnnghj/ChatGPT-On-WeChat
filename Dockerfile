@@ -1,11 +1,12 @@
 FROM python:3
+
 WORKDIR /app
 
 # 设置 Python 和 Node.js 环境
 ARG POETRY_VERSION=1.2.2
 RUN apt-get update && \
-    curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs npm && \
+    curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/cache/apk/* && \
     pip3 install --no-cache-dir poetry && \
     rm -rf ~/.cache/
@@ -15,8 +16,10 @@ COPY package*.json ./
 COPY pyproject.toml ./
 COPY poetry.lock ./
 
-# 安装依赖
+# 设置环境变量，避免下载无用的Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# 安装依赖
 RUN poetry install && npm install && npm install -g tsc-watch && rm -rf ~/.npm/
 
 # 复制项目源代码
