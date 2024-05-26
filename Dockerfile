@@ -11,11 +11,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 添加Node.js源并安装Node.js和npm
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get update && \
+# 使用NodeSource安装Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
     apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 安装npm并修复依赖项
+RUN apt-get update && \
     apt-get install -y npm && \
+    apt-get install -y node-rimraf node-semver node-string-width node-strip-ansi node-tar node-validate-npm-package-name node-which node-cli-table3 node-columnify node-cssesc node-debug node-emoji-regex node-gyp node-http-proxy-agent node-https-proxy-agent node-mkdirp node-ms node-nopt node-normalize-package-data node-npm-bundled node-npm-normalize-package-bin node-npm-package-arg node-npmlog node-postcss-selector-parser node-read-package-json && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
