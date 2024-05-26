@@ -11,9 +11,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装Node.js和npm
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs npm && \
+# 添加Node.js源并安装Node.js和npm
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get update && \
+    apt-get install -y nodejs && \
+    apt-get install -y npm && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
