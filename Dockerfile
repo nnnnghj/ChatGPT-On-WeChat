@@ -9,12 +9,15 @@ ARG POETRY_VERSION=1.2.2
 RUN apt-get update && \
     apt-get install -y curl gnupg
 
-# 添加Node.js源并安装Node.js和npm
+# 添加Node.js源并安装Node.js
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # 安装npm并修复缺失的依赖项
-RUN apt-get install -y npm --fix-missing && \
+RUN apt-get update && \
+    apt-get install -y npm --fix-missing && \
     apt-get install -f && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
