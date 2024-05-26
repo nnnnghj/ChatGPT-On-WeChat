@@ -7,14 +7,20 @@ ARG POETRY_VERSION=1.2.2
 
 # 更新apt-get并安装基本工具
 RUN apt-get update && \
-    apt-get install -y curl gnupg
+    apt-get install -y curl gnupg build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 安装Node.js和npm
-RUN apt-get install -y nodejs npm
+# 安装node版本管理工具n
+RUN curl -L https://raw.githubusercontent.com/tj/n/master/bin/n -o /usr/local/bin/n && \
+    chmod +x /usr/local/bin/n && \
+    n 16.0.0 && \
+    npm install -g npm@latest
 
 # 安装Poetry
 RUN pip install --no-cache-dir poetry==$POETRY_VERSION && \
-    rm -rf ~/.cache/
+    rm -rf ~/.cache/ && \
+    echo "环境设置完成"
 
 # 复制项目文件
 COPY package*.json ./
@@ -28,7 +34,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN poetry install && \
     npm install && \
     npm install -g tsc-watch && \
-    npm cache clean --force
+    npm cache clean --force && \
+    echo "依赖安装完成"
 
 # 复制项目源代码
 COPY . .
